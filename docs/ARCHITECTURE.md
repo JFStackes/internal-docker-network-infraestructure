@@ -15,7 +15,7 @@ Authorized laptop -- existing WireGuard --> central VPN router
                        +-- routed HTTPS --> node VPN IP:443 --> Traefik --> backend
 ```
 
-DNS and CA are centralized; ingress and certificate keys are per node. HTTPS terminates at that node. The root CA is offline. The central public Traefik is a separate system and its public services stay public. A VPN-only alias does not revoke an existing public domain.
+DNS and CA are centralized; ingress and certificate keys are per node. HTTPS terminates at that node. The root CA uses protected custody outside every deployment and container. Offline/removable custody is preferred; [ADR-0001](ADR-0001-root-custody.md) accepts a separate encrypted central-host vault for a single-administrator private installation. The central public Traefik is a separate system and its public services stay public. A VPN-only alias does not revoke an existing public domain.
 
 ## Identity and naming
 
@@ -41,7 +41,7 @@ No public application ports are added centrally. The node container listens on u
 
 ## PKI contract
 
-Offline encrypted P-256 root (10 years), online encrypted P-256 intermediate (3 years), EC256 per-service certificates (default 168 hours). These are defaults, not organizational PKI policy certification. Root and intermediate expiry need independent monitoring.
+Encrypted P-256 root (10 years) in a separate custody vault, online encrypted P-256 intermediate (3 years), EC256 per-service certificates (default 168 hours). These are defaults, not organizational PKI policy certification. Root and intermediate expiry need independent monitoring. A local central-host vault is never mounted into containers, never included in deployment backups and never stores its password; it is weaker than offline custody.
 
 ACME TLS-ALPN-01 requires step-ca to resolve private names and reach the node TLS endpoint. A dedicated ACME server does not require public DNS or Internet validation. No wildcard certificates: DNS-01 and authoritative DNS updates are out of scope. Traefik trusts the root via `LEGO_CA_CERTIFICATES`; clients import the same public root after fingerprint verification. Its private key is never distributed.
 
@@ -59,10 +59,11 @@ The open-source CA allowlist applies authority-wide. Each declared name must be 
 | Expired intermediate/root | Issuance/trust fails; perform planned rotation, not automatic root replacement. |
 | Application backend down | DNS/TLS may remain healthy, but proxy returns gateway failure. |
 | Backup restore incomplete | Marker blocks CLI startup; investigate/discard incomplete destination before retry. |
+| Central compromised with local root vault | Assume the encrypted vault was copied; if unlocked during compromise, rotate the entire root trust domain. |
 
 ## Accepted debt and triggers
 
-Single DNS/CA instance and manual maintenance windows are intentional. Introduce tested redundancy only when availability objectives require it. Inventory changes restart the affected profile; adding a service updates central CA policy as well as the node. Manual application network attachment is a prerequisite, not application orchestration. Firewall rules are reviewed externally because blindly changing Docker/VPN policy is unsafe.
+Single DNS/CA instance and manual maintenance windows are intentional. Introduce tested redundancy only when availability objectives require it. The accepted central-host root vault is intentional debt for a private, single-administrator installation; migrate to offline custody or a reviewed HSM/KMS design before public dependency, hostile tenancy, independent administrators, contractual security obligations or production certification. Inventory changes restart the affected profile; adding a service updates central CA policy as well as the node. Manual application network attachment is a prerequisite, not application orchestration. Firewall rules are reviewed externally because blindly changing Docker/VPN policy is unsafe.
 
 Image versions are pinned to full tags, with digest input supported. Tags are not immutable supply-chain locks; production promotion should record reviewed digests. The target platform matrix is Linux IPv4/rootful Docker only. An `age` roundtrip and real Docker/ACME integration remain release gates. No claim of ENS/ISO/GDPR compliance is made.
 

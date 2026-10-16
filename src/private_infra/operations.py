@@ -70,6 +70,49 @@ def repair_permissions(path: Path) -> None:
         print('Permission modes prepared; run permissions as root before Docker deployment (UID/GID 10000).')
 
 
+def _adguard_password(password_file: Path | None) -> str:
+    password = secret_read(password_file) if password_file else getpass.getpass('AdGuard admin password (16+ chars): ')
+    if not password_file and password != getpass.getpass('Repeat password: '):
+        raise InfraError('Passwords do not match')
+    if len(password) < 16 or len(password.encode()) > 72 or any(c in password for c in '\r\n\x00'):
+        raise InfraError('AdGuard password must be 16+ characters and no more than 72 UTF-8 bytes')
+    return password
+
+
+def _adguard_hash(password: str) -> str:
+    result = run(['htpasswd', '-niBC', '12', 'admin'],
+                 input_data=(password + '\n').encode(), quiet_errors=True)
+    fields = result.stdout.decode().strip().split(':', 1)
+    if len(fields) != 2 or fields[0] != 'admin' or not re.fullmatch(r'\$2[aby]\$\d\d\$[./A-Za-z0-9]{53}', fields[1]):
+        raise InfraError('htpasswd returned an invalid bcrypt hash')
+    return fields[1]
+
+
+def change_adguard_password(path: Path, password_file: Path | None = None) -> None:
+    path, metadata, _ = deployment_info(path)
+    if metadata['profile'] != 'central':
+        raise InfraError('admin-password only applies to central')
+    require_stopped(path)
+
+    conf_file = path / 'config/adguard/AdGuardHome.yaml'
+    hash_file = path / 'secrets/adguard_admin.hash'
+    old_config = no_symlinks(conf_file).read_bytes()
+    secret_read(hash_file)
+    conf = yaml.safe_load(old_config)
+    if not isinstance(conf, dict):
+        raise InfraError('Invalid AdGuard configuration')
+    hashed = _adguard_hash(_adguard_password(password_file))
+    conf['users'] = [{'name': 'admin', 'password': hashed}]
+
+    atomic_write(conf_file, dump(conf))
+    try:
+        atomic_write(hash_file, hashed + '\n')
+    except (InfraError, OSError):
+        atomic_write(conf_file, old_config)
+        raise
+    repair_permissions(path)
+
+
 def prepare(path: Path, password_file: Path | None = None) -> None:
     path, m, _ = deployment_info(path)
     if m['profile'] == 'central':
@@ -81,14 +124,7 @@ def prepare(path: Path, password_file: Path | None = None) -> None:
         conf = yaml.safe_load(conf_file.read_text())
         hash_file = path / 'secrets/adguard_admin.hash'
         if not hash_file.exists():
-            password = secret_read(password_file) if password_file else getpass.getpass('AdGuard admin password (16+ chars): ')
-            if not password_file and password != getpass.getpass('Repeat password: '):
-                raise InfraError('Passwords do not match')
-            if len(password) < 16 or len(password.encode()) > 72 or any(c in password for c in '\r\n\x00'):
-                raise InfraError('AdGuard password must be 16+ characters and no more than 72 UTF-8 bytes')
-            result = run(['htpasswd', '-niBC', '12', 'admin'],
-                         input_data=(password + '\n').encode(), quiet_errors=True)
-            hashed = result.stdout.decode().strip().split(':', 1)[1]
+            hashed = _adguard_hash(_adguard_password(password_file))
             atomic_write(hash_file, hashed + '\n')
         hashed = secret_read(hash_file)
         if not re.fullmatch(r'\$2[aby]\$\d\d\$[./A-Za-z0-9]{53}', hashed):
@@ -108,10 +144,10 @@ def file_checks(path: Path) -> list[str]:
     for entry in path.rglob('*'):
         if entry.is_symlink():
             errors.append(f'Symlink in deployment: {entry.relative_to(path)}')
-    # Root private keys must never be in the online deployment tree.
+    # Root private keys must never be in a runtime deployment tree or container mount.
     for root in ('root_ca.key', 'root.key'):
         if list(path.rglob(root)):
-            errors.append('An offline root key was found in the deployment; remove it securely')
+            errors.append('A root key was found in the deployment; move it to a separate custody vault')
     root = path / 'trust/root_ca.crt'
     pin = path / 'trust/root_ca.sha256'
     try:

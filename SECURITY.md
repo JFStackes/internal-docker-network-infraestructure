@@ -6,11 +6,11 @@ Report issues privately to the repository owner through the internal Git platfor
 
 One administrator controls the VPN, central host and nodes in each installation. Infrastructure identities are separate per device/service but initially share this administrative trust domain. Different customers require separate deployments/roots/VPNs. The project is not a security boundary between mutually hostile Docker workloads or tenants.
 
-An Internet attacker should not reach DNS, CA, admin UI or node ingress. An unauthorized VPN peer should not reach protected apps. A compromised rootful Docker host can compromise its containers and keys. A compromised central host exposes the online intermediate even though the root key remains offline. The offline root must be independently protected.
+An Internet attacker should not reach DNS, CA, admin UI or node ingress. An unauthorized VPN peer should not reach protected apps. A compromised rootful Docker host can compromise its containers and keys. A compromised central host always exposes the online intermediate. When the accepted local root-vault mode is used, it can also expose the encrypted root for offline attack; if the root is unlocked during compromise, treat it as exposed. Offline/removable root custody remains the stronger option.
 
 ## Implemented controls
 
-Private-address-only publishing, rootless container processes (not a rootless Docker daemon), dropped capabilities, read-only container root filesystems, bounded tmpfs/logging/resources, no Docker socket, no host networking/privilege, explicit private-file permissions, pinned root import and no TLS verification bypass.
+Private-address-only publishing, rootless container processes (not a rootless Docker daemon), all capabilities dropped except `NET_BIND_SERVICE` in the central images whose executable file metadata requires it, read-only container root filesystems, bounded tmpfs/logging/resources, no Docker socket, no host networking/privilege, explicit private-file permissions, pinned root import and no TLS verification bypass.
 
 Strict inventory validation rejects duplicate/unknown keys, unsafe input, unrestricted names and common invalid backends. File operations refuse symlink paths. External tools are invoked using argument arrays, not shell interpolation. Secret values are not command arguments; password input uses stdin or protected files. Keys are never silently overwritten. Runtime startup is explicit and guarded by preflight and firewall acknowledgment.
 
@@ -24,7 +24,7 @@ Preserve source IPs between VPN peers. Verify Traefik sees the actual laptop IP;
 
 AdGuard administration uses HTTP within the encrypted VPN by default; this is an explicit bootstrap/management exception. Do not expose it to the public Internet, LAN by wildcard binding, or an untrusted VPN user pool. Additional browser-HTTPS management ingress needs a separately reviewed design.
 
-Retain application authentication. Avoid logging full request URLs/tokens. Inspect effective configuration before adding DNS filters, disabling authentication or broadening ranges. Accurate time/NTP, patched hosts, encrypted backups and offline root custody remain operator responsibilities.
+Retain application authentication. Avoid logging full request URLs/tokens. Inspect effective configuration before adding DNS filters, disabling authentication or broadening ranges. Accurate time/NTP, patched hosts, encrypted backups and protected root custody remain operator responsibilities. A local root vault must stay outside deployment trees and container mounts, be root-owned, use an unstored password and have a separate encrypted recovery copy.
 
 ## Revocation and limitations
 

@@ -9,7 +9,7 @@ Build a reusable private infrastructure toolkit: central AdGuard Home/step-ca, n
 - One source repository, two independent deployment profiles. Never represent customers/nodes as long-lived Git branches.
 - No Docker labels/provider/socket, automatic SSH deployment, WireGuard edits, firewall edits, public-proxy changes or public-domain dependency.
 - DNS namespace must be `internal` or a subtree. No arbitrary `.arpa`, `.local`, `.lan`, wildcard CA certificates or TLS-verification bypass.
-- Root private key stays offline. Only online intermediate signing material belongs centrally. Pin public root imports by SHA-256; never silently replace a root or key.
+- Root private keys stay outside deployment trees, containers, Git and routine deployment backups. Offline/removable encrypted custody is preferred; an encrypted central-host vault outside the deployment is accepted only for a single-administrator private installation, with a manually entered password that is never stored. Pin public root imports by SHA-256; never silently replace a root or key.
 - Runtime files and secrets live outside Git. Do not generate keys into the source tree. Do not print passwords, PEM keys, ACME JSON or intermediate unlock secrets.
 - Explicit execution for service lifecycle. Dry run by default for compose/sync/backup/restore. Never `down -v`, auto-reset CA, flush firewall or delete user data.
 - Tenant/customer isolation is a separate deployment/CA/VPN, not an unimplemented account policy. Describe implemented security, not aspirations.

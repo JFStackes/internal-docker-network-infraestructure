@@ -3,9 +3,11 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+import yaml
 from private_infra.model import load_inventory
 from private_infra.render import render
-from private_infra.operations import prepare, file_checks, repair_permissions
+from private_infra.operations import change_adguard_password, prepare, file_checks, repair_permissions
 from private_infra.safeio import atomic_write, InfraError, run
 from private_infra import pki
 
@@ -22,7 +24,7 @@ class PKITests(unittest.TestCase):
         cls.password_file = cls.base / 'test-password'
         atomic_write(cls.password_file, 'temporary-test-password-ONLY-1234\n')
         prepare(cls.central, cls.password_file)
-        cls.root = cls.base / 'offline'
+        cls.root = cls.base / 'root-vault'
         cls.fp = pki.init_root(cls.root, 'Integration Test Root', 'offline-test-password-ONLY-4567')
         cls.csr = pki.intermediate_csr(cls.central, 'Integration Test Intermediate')
         cls.signed = cls.base / 'signed'
@@ -35,10 +37,11 @@ class PKITests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temp.cleanup()
 
-    def test_root_is_encrypted_and_offline(self):
+    def test_root_is_encrypted_and_outside_deployment(self):
         data = (self.root / 'root_ca.key').read_text()
         self.assertIn('ENCRYPTED PRIVATE KEY', data)
         self.assertFalse(any(self.central.rglob('root_ca.key')))
+        self.assertTrue((self.root / 'ROOT-CUSTODY.txt').is_file())
 
     def test_intermediate_is_encrypted_and_matches_certificate(self):
         key = self.central / 'pki/secrets/intermediate_ca.key'
@@ -67,6 +70,24 @@ class PKITests(unittest.TestCase):
         self.assertEqual(before_key, (self.central / 'pki/secrets/intermediate_ca.key').read_bytes())
         self.assertEqual(before_password, (self.central / 'secrets/intermediate_password').read_bytes())
         self.assertEqual(before_hash, (self.central / 'secrets/adguard_admin.hash').read_bytes())
+
+    def test_adguard_password_rotation_updates_hash_and_config(self):
+        password_file = self.base / 'replacement-password'
+        password = 'replacement-test-password-ONLY-7890'
+        atomic_write(password_file, password + '\n')
+        with patch('private_infra.operations.require_stopped'):
+            change_adguard_password(self.central, password_file)
+        hashed = (self.central / 'secrets/adguard_admin.hash').read_text().strip()
+        config = yaml.safe_load((self.central / 'config/adguard/AdGuardHome.yaml').read_text())
+        self.assertEqual(config['users'], [{'name': 'admin', 'password': hashed}])
+        verification = self.base / 'adguard-users'
+        atomic_write(verification, 'admin:' + hashed + '\n')
+        result = run(['htpasswd', '-vi', str(verification), 'admin'],
+                     input_data=(password + '\n').encode(), quiet_errors=True)
+        self.assertIn(b'correct', result.stdout + result.stderr)
+        with self.assertRaises(InfraError):
+            run(['htpasswd', '-vi', str(verification), 'admin'],
+                input_data=b'temporary-test-password-ONLY-1234\n', quiet_errors=True)
 
     def test_central_files_preflight(self):
         errors = file_checks(self.central)

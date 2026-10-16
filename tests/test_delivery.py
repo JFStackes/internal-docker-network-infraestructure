@@ -10,7 +10,7 @@ from unittest.mock import patch
 from private_infra.model import load_inventory, validate_inventory
 from private_infra.render import render
 from private_infra.safeio import InfraError, atomic_write
-from private_infra.operations import deployment_info, preflight, sync_config
+from private_infra.operations import change_adguard_password, deployment_info, preflight, sync_config
 from private_infra.cli import main
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,6 +70,20 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual((out / 'compose.yaml').read_bytes(), before)
         self.assertFalse((out / 'config-backups').exists())
 
+    def test_admin_password_refuses_running_profile_without_changes(self):
+        out = render(self.data, 'central', self.base / 'central-password')
+        password_file = self.base / 'password'
+        atomic_write(password_file, 'temporary-test-password-ONLY-1234\n')
+        from private_infra.operations import prepare
+        prepare(out, password_file)
+        before_config = (out / 'config/adguard/AdGuardHome.yaml').read_bytes()
+        before_hash = (out / 'secrets/adguard_admin.hash').read_bytes()
+        with patch('private_infra.operations.require_stopped', side_effect=InfraError('running')):
+            with self.assertRaisesRegex(InfraError, 'running'):
+                change_adguard_password(out, password_file)
+        self.assertEqual((out / 'config/adguard/AdGuardHome.yaml').read_bytes(), before_config)
+        self.assertEqual((out / 'secrets/adguard_admin.hash').read_bytes(), before_hash)
+
     def test_backup_and_restore_preview_do_not_execute_tools(self):
         out = render(self.data, 'central', self.base / 'central')
         commands = [
@@ -84,7 +98,7 @@ class DeliveryTests(unittest.TestCase):
             restore.assert_not_called()
         self.assertFalse((self.base / 'restored').exists())
 
-    def test_restore_members_cannot_include_offline_root_keys(self):
+    def test_restore_members_cannot_include_root_custody_keys(self):
         from private_infra.backup import safe_member
         for name in ('pki/secrets/root_ca.key', 'secrets/root.key', 'state/backup/root_ca.key'):
             self.assertFalse(safe_member(name))

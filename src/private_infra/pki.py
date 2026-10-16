@@ -49,11 +49,11 @@ def _new_key(path: Path, password: str) -> None:
 
 
 def init_root(output: Path, name: str, password: str) -> str:
-    """Call ONLY on an offline workstation/removable encrypted storage."""
+    """Create an encrypted root in a separately protected custody directory."""
     name = _name(name)
     output = no_symlinks(output)
     if output.exists() and any(output.iterdir()):
-        raise InfraError('Offline root directory must be empty; existing roots are never replaced')
+        raise InfraError('Root custody directory must be empty; existing roots are never replaced')
     private_dir(output)
     key, cert = output / 'root_ca.key', output / 'root_ca.crt'
     _new_key(key, password)
@@ -65,8 +65,9 @@ def init_root(output: Path, name: str, password: str) -> str:
          '-addext', 'subjectKeyIdentifier=hash'], input_data=(password + '\n').encode(), quiet_errors=True)
     fp = fingerprint(cert)
     atomic_write(output / 'root_ca.sha256', fp + '\n')
-    atomic_write(output / 'OFFLINE-ONLY.txt',
-        'Keep this directory offline. Never copy root_ca.key to a server, node, Git or an online backup.\n'
+    atomic_write(output / 'ROOT-CUSTODY.txt',
+        'Keep this directory separate from every deployment and never mount it into a container.\n'
+        'Offline or removable encrypted custody is preferred. A local online vault has a weaker trust boundary.\n'
         'The password is NOT stored here. Back up the encrypted root and password separately.\n')
     return fp
 

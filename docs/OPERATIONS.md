@@ -8,6 +8,19 @@ Run `doctor` from an authorized VPN client; inspect profile-specific `compose --
 
 Logs are container json-file with size/rotation limits. Query logging, statistics and Traefik access logging are disabled by default to reduce stored user data. Enable extra troubleshooting logs only deliberately and protect them. Do not paste full ACME JSON or signing secrets into tickets.
 
+## Change a forgotten AdGuard password
+
+Changing the generated administrator credential requires a short central maintenance window. The command refuses to modify a running profile, prompts twice without echoing the new password, replaces only the bcrypt credential and leaves services stopped for inspection. It does not reset AdGuard, DNS data, CA state or keys.
+
+```bash
+infra compose --deployment /opt/private-infra/central --action stop --execute
+infra admin-password --deployment /opt/private-infra/central
+infra preflight --deployment /opt/private-infra/central
+infra compose --deployment /opt/private-infra/central --action up --execute --ack-firewall
+```
+
+Use at least 16 characters and no more than 72 UTF-8 bytes. Do not put the plaintext password in inventory, Git or shell arguments. DNS and CA service are unavailable while central is stopped. After startup, sign in as `admin` at the private AdGuard URL and run the normal DNS/CA health checks.
+
 ## Versioned update
 
 1. Record current source version, image references/digests, inventory and runtime health. Review upstream notes and state migration compatibility.
@@ -31,7 +44,7 @@ infra backup --deployment /opt/private-infra/central \
 infra compose --deployment /opt/private-infra/central --action up --execute --ack-firewall
 ```
 
-Substitute an actual age recipient and unique output filename. The archive streams into age; no plaintext archive is written. Backup includes generated config, intermediate key/secret, CA database and protected state. A node backup includes its ACME accounts/private keys. The root private key is prohibited and backed up separately offline. Keep external firewall/VPN/application backups independently because they are outside scope.
+Substitute an actual age recipient and unique output filename. The archive streams into age; no plaintext archive is written. Backup includes generated config, intermediate key/secret, CA database and protected state. A node backup includes its ACME accounts/private keys. The root private key is prohibited from deployment backups and requires a separate encrypted custody backup; keep its password separately. Keep external firewall/VPN/application backups independently because they are outside scope.
 
 Cold backup consistency assumes the operator prevents another process from restarting the profile during the backup. The CLI detects running containers before starting; it is not a distributed maintenance lock. Check successful exit and file existence; failure must not be mistaken for a usable backup. Regularly perform a real restore drill, not just checksum the encrypted file.
 

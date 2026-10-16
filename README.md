@@ -21,7 +21,7 @@ There are **no Docker labels, Docker socket mounts or automatic discovery**. One
 ## What is included
 
 - Independent central/node Compose templates, deterministic renderer, strict inventory validation and generic/JFStack examples.
-- Offline-root/online-intermediate PKI tooling; pinned root import; individual service certificates through ACME TLS-ALPN-01.
+- Encrypted-root/online-intermediate PKI tooling, with offline custody preferred and a separated central-host vault accepted for single-administrator private installations; pinned root import; individual service certificates through ACME TLS-ALPN-01.
 - Local lifecycle CLI with explicit execution, preflight, stopped configuration synchronization and live DNS/TLS diagnostics.
 - Cold encrypted backup/restore using `age`, with safe extraction and no automatic service start.
 - Tests, CI, bilingual entry documentation and deployment/security/recovery runbooks.
@@ -58,7 +58,7 @@ For the discussed JFStack topology, start from `examples/inventory.jfstack.yaml`
 Follow [DEPLOYMENT](docs/DEPLOYMENT.md) and [PKI](docs/PKI.md), in this order:
 
 1. Verify the existing VPN and firewall independently; render to a protected directory on the target host.
-2. `prepare` the central deployment; generate its intermediate CSR. Create/sign with the root on an offline workstation, then import only public certificates using a verified SHA-256 fingerprint.
+2. `prepare` the central deployment and generate its intermediate CSR. Create/sign with a protected root vault—preferably offline, or in the documented separated central-host vault for a single-administrator private installation—then import only public certificates using a verified SHA-256 fingerprint.
 3. Start the central profile explicitly; validate DNS, private CA health and external exposure.
 4. Render/prepare the node, pin the public root, then start Traefik explicitly. Install the public root in trusted client certificate stores.
 5. Test initial issuance, renewal, source-IP ACLs and application connectivity before accepting the deployment.
@@ -75,7 +75,7 @@ A new service needs its node route **and the central CA's exact-name allowlist**
 
 Only private VPN addresses are used for host bindings. **A private binding is not a firewall policy.** Docker forwarding/NAT and host rules must be reviewed; enabling WireGuard alone does not authorize every peer. The admin HTTP interface defaults to VPN-only TCP 3000 (protected by WireGuard and a bcrypt password), not browser HTTPS; never expose it on a shared/untrusted network. Node application ingress is HTTPS only.
 
-The root key stays offline. The intermediate key, its local unlock secret, ACME accounts and application private keys are sensitive runtime data, excluded from Git. Protect full hosts and encrypted backups as well as file permissions. The root certificate is public but grants trust: verify its fingerprint independently before installing it.
+The root key stays outside deployment trees and containers. Offline/removable encrypted custody is preferred; the accepted central-host mode uses a separate encrypted vault, never stores its password and has a weaker compromise boundary. The intermediate key, its local unlock secret, ACME accounts and application private keys are sensitive runtime data, excluded from Git. Protect full hosts and encrypted backups as well as file permissions. The root certificate is public but grants trust: verify its fingerprint independently before installing it. See [ADR-0001](docs/ADR-0001-root-custody.md).
 
 CA policy in this edition is **authority-wide**, restricted to declared service names; TLS-ALPN-01 proves control of each node endpoint. Distinct ACME accounts do **not** implement per-account tenant isolation. Do not mix mutually untrusted customers in one CA. No EAB onboarding or account-specific policy is implemented.
 

@@ -4,7 +4,7 @@ These are **real CLI commands**, but the IPs in the generic example are placehol
 
 ## 1. Prepare tools and a private inventory
 
-On every target Linux host and the offline PKI workstation, provision Python >=3.11/OpenSSL 3. On target hosts also provide rootful Docker >=28, Compose >=2.24, `iproute2`, `apache2-utils`; install `age` for backups. Docker group membership is effectively host administration; this guide uses explicit sudo instead.
+On every target Linux host and any offline PKI workstation, provision Python >=3.11/OpenSSL 3. On target hosts also provide rootful Docker >=28, Compose >=2.24, `iproute2`, `apache2-utils`; install `age` for backups. Docker group membership is effectively host administration; this guide uses explicit sudo instead.
 
 ```bash
 python3 -m venv .venv
@@ -49,12 +49,12 @@ infra pki-csr --deployment /opt/private-infra/central
 
 `prepare` prompts for the AdGuard administrator password (16+ characters, <=72 UTF-8 bytes), stores a bcrypt hash, and creates the intermediate key unlock secret. It does not launch services. Its files will be owned by runtime UID10000. Use sudo to inspect them; do not relax modes to make casual access easier.
 
-Complete the **offline root ceremony** in [PKI.md](PKI.md). Transfer only the CSR to the offline machine, then root/intermediate public certificates back. Pin the fingerprint obtained independently:
+Complete one of the protected root custody ceremonies in [PKI.md](PKI.md). Offline/removable custody is preferred. For the accepted single-administrator local-vault mode, create the encrypted vault at `/opt/private-infra-root/SITE_ID`, outside the deployment, then sign into `/opt/private-infra/signed-central`. The root password must be entered manually and never stored. Pin the fingerprint recorded independently:
 
 ```bash
 infra pki-import --deployment /opt/private-infra/central \
-  --root /secure-transfer/root_ca.crt \
-  --intermediate /secure-transfer/intermediate_ca.crt \
+  --root /opt/private-infra/signed-central/root_ca.crt \
+  --intermediate /opt/private-infra/signed-central/intermediate_ca.crt \
   --fingerprint VERIFIED_ROOT_SHA256
 infra preflight --deployment /opt/private-infra/central
 infra compose --deployment /opt/private-infra/central --action config --execute
@@ -63,7 +63,7 @@ infra compose --deployment /opt/private-infra/central --action up --execute --ac
 infra compose --deployment /opt/private-infra/central --action ps --execute
 ```
 
-`VERIFIED_ROOT_SHA256` is a placeholder to replace, not a literal value. `--ack-firewall` records an operator acknowledgment; it is not an automated firewall audit. Preflight can reject required-version, port, ownership, trust or VPN-address errors; it cannot prove the whole network is safe.
+`SITE_ID` and `VERIFIED_ROOT_SHA256` are placeholders to replace, not literal values. Offline custody may use `/secure-transfer` instead of the shown local signed-output directory. `--ack-firewall` records an operator acknowledgment; it is not an automated firewall audit. Preflight can reject required-version, port, ownership, trust or VPN-address errors; it cannot prove the whole network is safe.
 
 At this stage inspect logs and test DNS/CA health with verified TLS. AdGuard administration is `http://CENTRAL_VPN_IP:3000`, over WireGuard only. The generated configuration is authoritative; use the UI for inspection, not unrecorded edits. AdGuard and the CA run as separate containers on the central bridge. The CA resolves through AdGuard's bridge IP, avoiding a DNS dependency on a missing host name at bootstrap.
 

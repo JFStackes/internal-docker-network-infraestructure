@@ -13,7 +13,7 @@ from . import pki
 from .model import load_inventory
 from .render import render
 from .safeio import InfraError, run, secret_read
-from .operations import deployment_info, prepare, repair_permissions, preflight, compose_args, sync_config, require_stopped
+from .operations import change_adguard_password, deployment_info, prepare, repair_permissions, preflight, compose_args, sync_config
 from .diagnostics import doctor
 
 
@@ -35,13 +35,15 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument('--output', type=Path, required=True)
     s = command('prepare', 'Create local secrets/state; never rotates existing keys', True)
     s.add_argument('--admin-password-file', type=Path)
+    s = command('admin-password', 'Replace the stopped central AdGuard administrator password', True)
+    s.add_argument('--admin-password-file', type=Path)
     command('permissions', 'Repair only this deployment runtime ownership and modes', True)
-    s = command('pki-root', 'Create an encrypted root on an OFFLINE workstation')
+    s = command('pki-root', 'Create an encrypted root in a protected custody directory')
     s.add_argument('--output', type=Path, required=True)
     s.add_argument('--name', required=True)
     s.add_argument('--password-file', type=Path)
     command('pki-csr', 'Generate the central intermediate key and CSR', True)
-    s = command('pki-sign', 'Sign an intermediate CSR OFFLINE; never export the root key')
+    s = command('pki-sign', 'Sign an intermediate CSR from the protected root vault')
     s.add_argument('--root-dir', type=Path, required=True)
     s.add_argument('--csr', type=Path, required=True)
     s.add_argument('--output', type=Path, required=True)
@@ -83,7 +85,7 @@ def parser() -> argparse.ArgumentParser:
 def _password(args, confirm=False):
     if args.password_file:
         return secret_read(args.password_file)
-    value = getpass.getpass('Offline root password: ')
+    value = getpass.getpass('Root vault password: ')
     if confirm and value != getpass.getpass('Repeat password: '):
         raise InfraError('Passwords do not match')
     return value
@@ -103,10 +105,13 @@ def main(argv=None) -> int:
         elif c == 'prepare':
             prepare(args.deployment, args.admin_password_file)
             print('Local secrets/state prepared. Existing keys were not rotated.')
+        elif c == 'admin-password':
+            change_adguard_password(args.deployment, args.admin_password_file)
+            print('AdGuard administrator password updated. Services remain stopped.')
         elif c == 'permissions':
             repair_permissions(args.deployment)
         elif c == 'pki-root':
-            print('OFFLINE OPERATION. Do not perform this on the online central host.')
+            print('ROOT CUSTODY OPERATION. Keep the vault outside deployments; never store its password.')
             print('Root SHA-256:', pki.init_root(args.output, args.name, _password(args, True)))
         elif c == 'pki-csr':
             path, meta, inv = deployment_info(args.deployment)

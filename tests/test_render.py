@@ -44,6 +44,10 @@ class RenderTests(unittest.TestCase):
             for svc in compose['services'].values():
                 self.assertEqual(svc['user'], '10000:10000')
                 self.assertEqual(svc['cap_drop'], ['ALL'])
+                if role == 'central':
+                    self.assertEqual(svc['cap_add'], ['NET_BIND_SERVICE'])
+                else:
+                    self.assertNotIn('cap_add', svc)
                 self.assertTrue(svc['read_only'])
                 self.assertIn('no-new-privileges:true', svc['security_opt'])
                 self.assertNotIn('labels', svc)
@@ -59,6 +63,10 @@ class RenderTests(unittest.TestCase):
         ports = [int(p.split(':')[1]) for svc in compose['services'].values() for p in svc['ports']]
         self.assertFalse(set(ports) & {80, 443, 51820})
         self.assertEqual(set(ports), {53, 3000, 9000})
+        health = compose['services']['step-ca']['healthcheck']['test']
+        self.assertEqual(health[:4], ['CMD', 'step', 'ca', 'health'])
+        self.assertIn('https://10.88.0.1:9000', health)
+        self.assertIn('/home/step/certs/root_ca.crt', health)
 
     def test_node_uses_file_provider_only_and_trusted_ca(self):
         out = render(self.data, 'node', self.base / 'node', 'node01')

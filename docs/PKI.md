@@ -4,29 +4,51 @@
 
 | Material | Where | Sensitivity |
 |---|---|---|
-| Root private key | Encrypted offline storage only | Highest; never online/Git |
-| Root certificate + SHA-256 fingerprint | Offline master, central, nodes, approved clients | Public, integrity-critical |
+| Root private key | Separate encrypted custody vault; offline/removable preferred, central-host exception documented below | Highest; never in Git, a deployment tree, container or deployment backup |
+| Root certificate + SHA-256 fingerprint | Root vault, central, nodes, approved clients | Public, integrity-critical |
 | Intermediate private key | Central runtime PKI directory | Sensitive, encrypted at rest |
 | Intermediate unlock secret | Central protected secrets directory | Sensitive; host compromise can access both |
 | Intermediate certificate | Central, delivered in certificate chains | Public |
 | ACME account and leaf private keys | Each node's persistent acme.json | Sensitive, never copied to other nodes |
 
-Default validity is 3650 days for the root, 1095 days for the intermediate, and 168 hours for application certificates. This does not implement HSM protection, offline intermediate signing or an enterprise revocation distribution system. The online unlock secret means encryption is not protection against root on the central host. Keep systems patched and backups encrypted.
+Default validity is 3650 days for the root, 1095 days for the intermediate, and 168 hours for application certificates. This does not implement HSM protection, offline intermediate signing or an enterprise revocation distribution system. The online intermediate unlock secret means encryption is not protection against root on the central host. A local root vault has a manually entered, unstored password, but host compromise can still copy it for offline attack or capture it while unlocked. Keep systems patched and backups encrypted.
 
-## Offline root ceremony
+## Root custody modes
 
-On an offline workstation, with the toolkit and dependencies installed beforehand:
+Offline or removable encrypted custody remains preferred. [ADR-0001](ADR-0001-root-custody.md) also accepts a local encrypted vault for a private installation controlled by one administrator. The local vault must be outside every rendered deployment, owned by root, never mounted into a container and excluded from deployment backups. `/opt/private-infra-root/SITE_ID` is the convention; `/opt/private-infra/central` remains the runtime tree.
+
+Do not store the root password in a file, shell history, environment variable, password argument or on the same host. The CLI reads it interactively. Keep a separate encrypted copy of the vault and retain its password separately.
+
+## Create the root
+
+For preferred offline custody, run on the offline workstation or removable encrypted storage:
 
 ```bash
 .venv/bin/python bin/private-infra pki-root \
   --output /encrypted-offline/private-infra-root --name "Example Private Root CA"
 ```
 
-Choose and separately retain a strong password. Record the printed SHA-256 fingerprint through an independent channel. The command creates `root_ca.key`, `root_ca.crt`, `root_ca.sha256`; it never stores the root password. It refuses a nonempty output directory. The code warns about offline operation but cannot prove the machine is disconnected.
+For the accepted single-administrator central-host vault, run through the protected `infra` function from DEPLOYMENT.md:
 
-On the central host, `prepare` and `pki-csr` create the intermediate encrypted key locally and output a **public CSR** at `pki/intermediate_ca.csr`. Transfer that CSR to the offline workstation. Its private key must remain centrally.
+```bash
+sudo install -d -m 0700 -o root -g root /opt/private-infra-root
+infra pki-root --output /opt/private-infra-root/jfstack \
+  --name "JFStack Private Root CA"
+```
 
-On the offline workstation:
+Choose and separately retain a strong password. Record the printed SHA-256 fingerprint through an independent channel. The command creates `root_ca.key`, `root_ca.crt`, `root_ca.sha256` and `ROOT-CUSTODY.txt`; it never stores the root password and refuses a nonempty output directory.
+
+## Sign the intermediate
+
+On the central host, `prepare` and `pki-csr` create the intermediate encrypted key locally and output a **public CSR** at `pki/intermediate_ca.csr`. Its private key remains in the central deployment. For offline custody, transfer only the CSR to the offline workstation and return only public certificates. For the local-vault mode, sign directly from the separate vault:
+
+```bash
+infra pki-sign --root-dir /opt/private-infra-root/jfstack \
+  --csr /opt/private-infra/central/pki/intermediate_ca.csr \
+  --output /opt/private-infra/signed-central
+```
+
+The equivalent offline command is:
 
 ```bash
 .venv/bin/python bin/private-infra pki-sign \
@@ -35,7 +57,7 @@ On the offline workstation:
   --output /secure-transfer/signed-central
 ```
 
-Review which customer/site you are signing. Keep separate root directories for different trust domains. Transfer only `root_ca.crt`, `intermediate_ca.crt` and the independently verified fingerprint back to the central host. Never copy the entire offline directory. Import with the commands in DEPLOYMENT.md; the importer verifies fingerprint, chain, CA constraints and private/public key match.
+Review which customer/site you are signing. Keep separate root directories for different trust domains. In offline mode, never copy the entire root directory back. Import only `root_ca.crt` and `intermediate_ca.crt` with the independently verified fingerprint using DEPLOYMENT.md; the importer verifies fingerprint, chain, CA constraints and private/public key match.
 
 ## ACME lifecycle
 
@@ -65,4 +87,4 @@ For root rotation, distribute a new public root to every relying client before i
 
 For a compromised node, remove/disable its VPN access and services, revoke/replace affected credentials and rebuild its ACME state through a reviewed procedure. Removing a hostname from CA policy blocks future issuance but does not erase an already issued certificate. Revocation checking is not guaranteed in every browser; use short lifetimes, network containment and emergency root/intermediate procedures proportionately.
 
-For central compromise, assume the intermediate key and local unlock secret are both exposed. Isolate it, perform incident response and decide whether replacement of the intermediate or entire root trust is required. Restore from backup only after establishing trustworthy hosts and credentials.
+For central compromise, assume the intermediate key and local unlock secret are both exposed. If a local root vault exists, assume its encrypted contents were copied; if it was unlocked during the suspected window, assume the root itself was exposed and rotate the entire trust domain. Isolate the host and restore only after establishing trustworthy systems and credentials.

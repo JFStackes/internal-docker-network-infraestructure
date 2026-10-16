@@ -21,7 +21,7 @@ Un nombre como `app.node01.client.internal` resuelve a la **IP VPN del nodo**. E
 ## Contenido
 
 - Plantillas Compose independientes para central/node, generador determinista, validación estricta y ejemplos genérico/JFStack.
-- Herramientas PKI con raíz offline e intermedia online; importación de confianza por huella; certificados individuales mediante ACME TLS-ALPN-01.
+- Herramientas PKI con raíz cifrada e intermedia online, prefiriendo custodia offline y aceptando un almacén separado en el host central para instalaciones privadas con un solo administrador; importación de confianza por huella; certificados individuales mediante ACME TLS-ALPN-01.
 - CLI local con ejecución explícita, comprobaciones previas, sincronización de configuración con servicios detenidos y diagnóstico DNS/TLS.
 - Copia/restauración en frío cifrada con `age`, extracción segura y sin arranque automático.
 - Pruebas, CI, documentación de entrada bilingüe y procedimientos de despliegue, seguridad y recuperación.
@@ -58,7 +58,7 @@ Para la topología JFStack de esta conversación utiliza `examples/inventory.jfs
 Sigue [DEPLOYMENT](DEPLOYMENT.md) y [PKI](PKI.md) en este orden:
 
 1. Verifica por separado VPN y firewall; genera los archivos en un directorio protegido del host correspondiente.
-2. Ejecuta `prepare` en central y genera su CSR intermedio. Crea/firma con la raíz en un equipo offline; importa solamente certificados públicos comprobando una huella SHA-256 independiente.
+2. Ejecuta `prepare` en central y genera su CSR intermedio. Crea/firma con un almacén protegido para la raíz —preferiblemente offline, o mediante el almacén separado documentado en el host central para una instalación privada con un solo administrador— e importa solamente certificados públicos comprobando una huella SHA-256 independiente.
 3. Arranca central explícitamente; valida DNS, estado de la CA privada y exposición externa.
 4. Genera/prepara el nodo, importa la raíz verificada y arranca Traefik explícitamente. Instala la raíz pública en los almacenes de confianza de los clientes.
 5. Prueba emisión inicial, renovación, ACL por origen y conectividad con aplicaciones antes de aceptar el despliegue.
@@ -75,7 +75,7 @@ Una aplicación nueva necesita actualizar su ruta en el nodo **y la lista exacta
 
 Los puertos se publican solamente en direcciones VPN privadas. **La vinculación a una IP privada no sustituye al firewall.** Hay que revisar forwarding/NAT de Docker y reglas del host; conectarse a WireGuard no autoriza a cualquier peer. El panel administrativo utiliza HTTP en TCP 3000 solo por VPN, protegido por WireGuard y una contraseña bcrypt, no HTTPS de navegador. Nunca lo expongas en redes compartidas o no fiables. Las aplicaciones de los nodos se publican exclusivamente por HTTPS.
 
-La clave raíz permanece offline. La clave intermedia, su secreto local de apertura, las cuentas ACME y las claves de aplicaciones son datos sensibles, excluidos de Git. Protege los hosts y las copias cifradas, además de los permisos. El certificado raíz es público, pero concede confianza: verifica su huella por un canal independiente.
+La clave raíz permanece fuera de los árboles de despliegue y de los contenedores. Se prefiere la custodia offline o en un medio extraíble cifrado; el modo aceptado en el host central usa un almacén cifrado separado, nunca guarda su contraseña y tiene un límite de compromiso más débil. La clave intermedia, su secreto local de apertura, las cuentas ACME y las claves de aplicaciones son datos sensibles, excluidos de Git. Protege los hosts y las copias cifradas, además de los permisos. El certificado raíz es público, pero concede confianza: verifica su huella por un canal independiente. Consulta [ADR-0001](ADR-0001-root-custody.md).
 
 La política CA de esta edición es **global a la autoridad**, restringida a nombres declarados; TLS-ALPN-01 demuestra el control del endpoint del nodo. Las cuentas ACME diferentes **no** implementan aislamiento de clientes por cuenta. No mezcles clientes que no confíen entre sí en una misma CA. No se implementan altas EAB ni políticas por cuenta.
 

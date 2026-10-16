@@ -30,7 +30,7 @@ def backup(deployment: Path, output: Path, recipient: str) -> None:
     for path in deployment.rglob('*'):
         no_symlinks(path)
         if path.name in ('root_ca.key', 'root.key'):
-            raise InfraError('Offline root keys must not be included in online backups')
+            raise InfraError('Root custody keys must not be included in deployment backups')
     output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:

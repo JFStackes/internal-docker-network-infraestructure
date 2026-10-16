@@ -14,6 +14,8 @@ deployments/
 secrets/
 state/
 offline-root/
+root-vault/
+private-infra-root/
 *.key
 *.pem
 *.p12
