@@ -1,0 +1,39 @@
+# Generic example. Copy outside this repository; replace addresses and site identity.
+schema_version: 1
+site:
+  id: example
+  name: Example Private Infrastructure
+  namespace: client.internal
+vpn:
+  network: 10.88.0.0/24
+  interface: wg0
+central:
+  vpn_ip: 10.88.0.1
+  docker_subnet: 172.30.40.0/28
+  dns_container_ip: 172.30.40.2
+  dns_name: dns.client.internal
+  ca_name: ca.client.internal
+  admin_port: 3000
+  ca_port: 9000
+  upstream_dns: [9.9.9.9, 149.112.112.112]
+pki:
+  name: Example Private CA
+  email: admin@example.invalid
+  certificate_hours: 168
+access:
+  admin_cidrs: [10.88.0.10/32]
+  infrastructure_cidrs: [10.88.0.1/32, 10.88.0.2/32]
+nodes:
+  node01:
+    vpn_ip: 10.88.0.2
+    external_networks: []
+    services:
+      app:
+        enabled: true
+        backend: http://10.88.0.2:8080
+        access: admin
+        description: Replace with a backend reachable from the proxy container.
+images:
+  adguard: adguard/adguardhome:v0.107.79
+  step_ca: smallstep/step-ca:0.30.2
+  traefik: traefik:v3.7.14

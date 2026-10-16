@@ -1,0 +1,91 @@
+BUILD VALIDATION RECORD
+Product: Private Infrastructure 0.1.0
+Date: 2026-10-15
+Acceptance: source review / local automated checks; live integration pending
+
+ACTUAL ENVIRONMENT
+Python: 3.13.5
+PyYAML: 6.0.3
+OpenSSL: OpenSSL 3.5.5 27 Jan 2026 (Library: OpenSSL 3.5.5 27 Jan 2026)
+htpasswd: present; bcrypt generation exercised
+Docker CLI/daemon: not available in this environment
+age executable: not available in this environment
+Customer servers/VPN: not connected or modified
+
+EXECUTED
+python3 scripts/check_repository.py: PASS
+sh -n scripts/test.sh: PASS
+./scripts/test.sh: PASS, 56 tests, no skips
+Python byte-compilation: PASS
+CLI --help / --version: PASS
+Both example inventories: validated and rendered locally
+No container images, credentials or generated CA keys included in source archive
+
+NOT EXECUTED
+Docker Compose vendor parser, image pull/startup, actual AdGuard DNS rules,
+step-ca startup, end-to-end ACME issuance/renewal, host firewall behavior,
+WireGuard routing, browser trust, age encryption/decryption roundtrip.
+See docs/VALIDATION.md for the complete production acceptance checklist.
+
+UNIT TEST OUTPUT
+test_backup_and_restore_preview_do_not_execute_tools (test_delivery.DeliveryTests.test_backup_and_restore_preview_do_not_execute_tools) ... ok
+test_ca_name_matches_openssl_subject_contract (test_delivery.DeliveryTests.test_ca_name_matches_openssl_subject_contract) ... ok
+test_files_only_preflight_reports_unprepared_ca (test_delivery.DeliveryTests.test_files_only_preflight_reports_unprepared_ca) ... ok
+test_incomplete_restore_blocks_deployment (test_delivery.DeliveryTests.test_incomplete_restore_blocks_deployment) ... ok
+test_jfstack_backend_exceptions_remain_disabled (test_delivery.DeliveryTests.test_jfstack_backend_exceptions_remain_disabled) ... ok
+test_modified_runtime_identity_rejected (test_delivery.DeliveryTests.test_modified_runtime_identity_rejected) ... ok
+test_repository_consistency (test_delivery.DeliveryTests.test_repository_consistency) ... ok
+test_reserved_node_name_cannot_collide_with_central (test_delivery.DeliveryTests.test_reserved_node_name_cannot_collide_with_central) ... ok
+test_restore_members_cannot_include_offline_root_keys (test_delivery.DeliveryTests.test_restore_members_cannot_include_offline_root_keys) ... ok
+test_sync_rejects_running_profile (test_delivery.DeliveryTests.test_sync_rejects_running_profile) ... ok
+test_backend_rejects_unsafe_or_unreachable_defaults (test_model.InventoryTests.test_backend_rejects_unsafe_or_unreachable_defaults) ... ok
+test_digest_images_allowed (test_model.InventoryTests.test_digest_images_allowed) ... ok
+test_disabled_services_not_authorized_by_ca (test_model.InventoryTests.test_disabled_services_not_authorized_by_ca) ... ok
+test_duplicate_yaml_rejected (test_model.InventoryTests.test_duplicate_yaml_rejected) ... ok
+test_examples (test_model.InventoryTests.test_examples) ... ok
+test_forbids_unknown_keys (test_model.InventoryTests.test_forbids_unknown_keys) ... ok
+test_known_good_backends (test_model.InventoryTests.test_known_good_backends) ... ok
+test_private_namespaces (test_model.InventoryTests.test_private_namespaces) ... ok
+test_schema_rejects_ambiguous_inputs (test_model.InventoryTests.test_schema_rejects_ambiguous_inputs) ... ok
+test_yaml_tags_are_not_executed (test_model.InventoryTests.test_yaml_tags_are_not_executed) ... ok
+test_central_files_preflight (test_pki.PKITests.test_central_files_preflight) ... ok
+test_existing_intermediate_not_overwritten (test_pki.PKITests.test_existing_intermediate_not_overwritten) ... ok
+test_existing_root_not_overwritten (test_pki.PKITests.test_existing_root_not_overwritten) ... ok
+test_intermediate_is_encrypted_and_matches_certificate (test_pki.PKITests.test_intermediate_is_encrypted_and_matches_certificate) ... ok
+test_mismatched_key_certificate_rejected (test_pki.PKITests.test_mismatched_key_certificate_rejected) ... ok
+test_node_trust_bootstrap_is_pinned (test_pki.PKITests.test_node_trust_bootstrap_is_pinned) ... ok
+test_prepare_does_not_rotate_existing_secrets (test_pki.PKITests.test_prepare_does_not_rotate_existing_secrets) ... ok
+test_root_is_encrypted_and_offline (test_pki.PKITests.test_root_is_encrypted_and_offline) ... ok
+test_wrong_fingerprint_is_rejected (test_pki.PKITests.test_wrong_fingerprint_is_rejected) ... ok
+test_acl_source_ranges_not_forwarded_headers (test_render.RenderTests.test_acl_source_ranges_not_forwarded_headers) ... ok
+test_adguard_not_open_admin (test_render.RenderTests.test_adguard_not_open_admin) ... ok
+test_all_bindings_are_explicit_private_ipv4 (test_render.RenderTests.test_all_bindings_are_explicit_private_ipv4) ... ok
+test_ca_limits_are_exact_and_wildcards_disabled (test_render.RenderTests.test_ca_limits_are_exact_and_wildcards_disabled) ... ok
+test_central_does_not_publish_80_443_or_wireguard (test_render.RenderTests.test_central_does_not_publish_80_443_or_wireguard) ... ok
+test_deterministic_render (test_render.RenderTests.test_deterministic_render) ... ok
+test_dns_rules_are_local_for_all_rr_types (test_render.RenderTests.test_dns_rules_are_local_for_all_rr_types) ... ok
+test_external_networks_are_opt_in (test_render.RenderTests.test_external_networks_are_opt_in) ... ok
+test_hardening_in_both_profiles (test_render.RenderTests.test_hardening_in_both_profiles) ... ok
+test_node_uses_file_provider_only_and_trusted_ca (test_render.RenderTests.test_node_uses_file_provider_only_and_trusted_ca) ... ok
+test_render_refuses_existing_output (test_render.RenderTests.test_render_refuses_existing_output) ... ok
+test_render_rejects_symlink_output (test_render.RenderTests.test_render_rejects_symlink_output) ... ok
+test_render_two_independent_profiles (test_render.RenderTests.test_render_two_independent_profiles) ... ok
+test_unknown_node_rejected (test_render.RenderTests.test_unknown_node_rejected) ... ok
+test_archive_path_controls (test_safety.SafetyTests.test_archive_path_controls) ... ok
+test_compose_actions_scoped_to_one_project (test_safety.SafetyTests.test_compose_actions_scoped_to_one_project) ... ok
+test_compose_dry_run_never_runs_docker (test_safety.SafetyTests.test_compose_dry_run_never_runs_docker) ... ok
+test_compose_up_requires_firewall_ack (test_safety.SafetyTests.test_compose_up_requires_firewall_ack) ... ok
+test_dns_parser_nxdomain (test_safety.SafetyTests.test_dns_parser_nxdomain) ... ok
+test_dns_parser_positive (test_safety.SafetyTests.test_dns_parser_positive) ... ok
+test_dns_parser_rejects_malformed (test_safety.SafetyTests.test_dns_parser_rejects_malformed) ... ok
+test_no_files_changed_by_validate (test_safety.SafetyTests.test_no_files_changed_by_validate) ... ok
+test_secret_world_readable_rejected (test_safety.SafetyTests.test_secret_world_readable_rejected) ... ok
+test_symlink_secret_rejected (test_safety.SafetyTests.test_symlink_secret_rejected) ... ok
+test_sync_cold_preserves_acme_and_removes_stale_routes (test_safety.SafetyTests.test_sync_cold_preserves_acme_and_removes_stale_routes) ... ok
+test_sync_dry_run_preserves_state (test_safety.SafetyTests.test_sync_dry_run_preserves_state) ... ok
+test_sync_rejects_namespace_change (test_safety.SafetyTests.test_sync_rejects_namespace_change) ... ok
+
+----------------------------------------------------------------------
+Ran 56 tests in 1.574s
+
+OK

@@ -1,0 +1,71 @@
+# Illustrative JFStack topology from the design discussion; no credentials.
+# 10.77.0.10 is a PROPOSED laptop address, not an already configured peer.
+# Backend connectivity from the proxy container remains a deployment prerequisite.
+schema_version: 1
+site:
+  id: jfstack
+  name: JFStack Private Infrastructure
+  namespace: internal
+vpn:
+  network: 10.77.0.0/24
+  interface: wg0
+central:
+  vpn_ip: 10.77.0.1
+  docker_subnet: 172.30.40.0/28
+  dns_container_ip: 172.30.40.2
+  dns_name: dns.internal
+  ca_name: ca.internal
+  admin_port: 3000
+  ca_port: 9000
+  upstream_dns: [9.9.9.9, 149.112.112.112]
+pki:
+  name: JFStack Private CA
+  email: admin@jfstack.invalid
+  certificate_hours: 168
+access:
+  admin_cidrs: [10.77.0.10/32]
+  infrastructure_cidrs: [10.77.0.1/32, 10.77.0.2/32]
+nodes:
+  dust01:
+    vpn_ip: 10.77.0.2
+    external_networks: []
+    services:
+      radarr:
+        enabled: true
+        backend: http://10.77.0.2:7878
+        access: admin
+      sonarr:
+        enabled: true
+        backend: http://10.77.0.2:8989
+        access: admin
+      prowlarr:
+        enabled: true
+        backend: http://10.77.0.2:9696
+        access: admin
+      bazarr:
+        enabled: true
+        backend: http://10.77.0.2:6767
+        access: admin
+      jellyfin:
+        enabled: true
+        backend: http://10.77.0.2:8096
+        access: admin
+        description: The existing public domain remains public until changed separately.
+      seerr:
+        enabled: true
+        backend: http://10.77.0.2:5055
+        access: admin
+      torrent:
+        enabled: false
+        backend: http://qbittorrent:8081
+        access: admin
+        description: Disabled. Current host mapping is loopback-only; configure shared network first.
+      files:
+        enabled: false
+        backend: http://filebrowser:80
+        access: admin
+        description: Disabled. Current host port 8090 is loopback-only; configure shared network first.
+images:
+  adguard: adguard/adguardhome:v0.107.79
+  step_ca: smallstep/step-ca:0.30.2
+  traefik: traefik:v3.7.14

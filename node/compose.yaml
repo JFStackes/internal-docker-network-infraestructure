@@ -1,0 +1,38 @@
+# Template, rendered by bin/private-infra. No Docker socket/provider/labels.
+name: private-${SITE_ID}-${NODE_ID}
+services:
+  traefik:
+    image: ${TRAEFIK_IMAGE}
+    user: "10000:10000"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    command: ["--configFile=/etc/traefik/traefik.yml"]
+    environment:
+      LEGO_CA_CERTIFICATES: /etc/private-ca/root_ca.crt
+    dns: ["${DNS_IP}"]
+    ports: ["${BIND_IP}:443:8443/tcp"]
+    volumes:
+      - type: bind
+        source: ./config/traefik
+        target: /etc/traefik
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./trust
+        target: /etc/private-ca
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./state/traefik
+        target: /var/lib/traefik
+        bind: {create_host_path: false}
+    tmpfs: ["/tmp:size=32m,mode=1777,noexec,nosuid"]
+    pids_limit: 128
+    mem_limit: 256m
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+    networks: [proxy]
+networks:
+  proxy:
+    driver: bridge

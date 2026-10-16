@@ -1,0 +1,6 @@
+! Managed by Private Infrastructure. Change the inventory, not this list.
+||internal^$dnsrewrite=NXDOMAIN;;,denyallow=ca.client.internal|dns.client.internal|node01.client.internal
+||ca.client.internal^$dnsrewrite=NOERROR;A;10.88.0.1
+||dns.client.internal^$dnsrewrite=NOERROR;A;10.88.0.1
+||node01.client.internal^$dnsrewrite=NOERROR;A;10.88.0.2
+||2.0.88.10.in-addr.arpa^$dnsrewrite=NOERROR;PTR;node01.client.internal.

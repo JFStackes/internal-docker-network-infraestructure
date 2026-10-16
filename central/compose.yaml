@@ -1,0 +1,87 @@
+# Template, rendered by bin/private-infra. Do not run this template directly.
+name: private-${SITE_ID}-central
+services:
+  adguard:
+    image: ${ADGUARD_IMAGE}
+    user: "10000:10000"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # Low ports only in this container network namespace, not on the host.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    command: ["--no-check-update", "-c", "/opt/adguardhome/conf/AdGuardHome.yaml", "-w", "/opt/adguardhome/work"]
+    ports:
+      - "${BIND_IP}:53:53/tcp"
+      - "${BIND_IP}:53:53/udp"
+      # Bootstrap/administration over the encrypted VPN; restrict to admin peers.
+      - "${BIND_IP}:${ADMIN_PORT}:3000/tcp"
+    volumes:
+      - type: bind
+        source: ./config/adguard
+        target: /opt/adguardhome/conf
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./state/adguard
+        target: /opt/adguardhome/work
+        bind: {create_host_path: false}
+    tmpfs: ["/tmp:size=32m,mode=1777,noexec,nosuid"]
+    pids_limit: 128
+    mem_limit: 256m
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+    networks:
+      control:
+        ipv4_address: ${DNS_CONTAINER_IP}
+  step-ca:
+    image: ${STEP_CA_IMAGE}
+    user: "10000:10000"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # Explicit entrypoint avoids image auto-initialization and online root keys.
+    entrypoint: ["step-ca"]
+    command: ["/home/step/config/ca.json", "--password-file", "/run/secrets/intermediate_password"]
+    environment:
+      STEPPATH: /home/step
+      HOME: /home/step
+    dns: ["${DNS_CONTAINER_IP}"]
+    depends_on:
+      adguard: {condition: service_started}
+    ports: ["${BIND_IP}:${CA_PORT}:9000/tcp"]
+    volumes:
+      - type: bind
+        source: ./config/step-ca
+        target: /home/step/config
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./pki/certs
+        target: /home/step/certs
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./pki/secrets
+        target: /home/step/secrets
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./secrets/intermediate_password
+        target: /run/secrets/intermediate_password
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./state/step-ca
+        target: /home/step/db
+        bind: {create_host_path: false}
+    tmpfs: ["/tmp:size=32m,mode=1777,noexec,nosuid"]
+    pids_limit: 128
+    mem_limit: 512m
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+    networks: [control]
+networks:
+  control:
+    driver: bridge
+    ipam:
+      config: [{subnet: "${DOCKER_SUBNET}"}]

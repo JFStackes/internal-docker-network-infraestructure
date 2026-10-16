@@ -1,0 +1,27 @@
+# Generated example only; edit inventory, not this file.
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+entryPoints:
+  websecure:
+    address: :8443
+  health:
+    address: :8082
+ping:
+  entryPoint: health
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+log:
+  level: INFO
+  format: json
+certificatesResolvers:
+  private-ca:
+    acme:
+      caServer: https://ca.client.internal:9000/acme/internal/directory
+      email: admin@example.invalid
+      storage: /var/lib/traefik/acme.json
+      certificatesDuration: 168
+      keyType: EC256
+      tlsChallenge: {}

@@ -1,0 +1,50 @@
+# Generated example only; edit inventory, not this file.
+http:
+  routers:
+    app:
+      rule: Host(`app.node01.client.internal`)
+      entryPoints:
+      - websecure
+      service: app
+      middlewares:
+      - admin-only
+      - private-headers
+      tls:
+        certResolver: private-ca
+  services:
+    app:
+      loadBalancer:
+        passHostHeader: true
+        serversTransport: verified-upstream
+        servers:
+        - url: http://10.88.0.2:8080
+  middlewares:
+    admin-only:
+      ipAllowList:
+        sourceRange:
+        - 10.88.0.10/32
+    infra-and-admin:
+      ipAllowList:
+        sourceRange:
+        - 10.88.0.1/32
+        - 10.88.0.10/32
+        - 10.88.0.2/32
+    private-headers:
+      headers:
+        contentTypeNosniff: true
+        referrerPolicy: same-origin
+        customResponseHeaders:
+          Server: ''
+          X-Powered-By: ''
+  serversTransports:
+    verified-upstream:
+      rootCAs:
+      - /etc/private-ca/root_ca.crt
+      forwardingTimeouts:
+        dialTimeout: 10s
+        responseHeaderTimeout: 60s
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true

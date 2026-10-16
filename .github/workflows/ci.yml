@@ -1,0 +1,37 @@
+name: Repository checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install local test prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-venv openssl apache2-utils
+          python3 -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+      - name: Offline checks and tests
+        run: |
+          .venv/bin/python scripts/check_repository.py
+          PATH="$PWD/.venv/bin:$PATH" ./scripts/test.sh
+      - name: Render and validate Compose syntax only
+        run: |
+          set -eu
+          output=$(mktemp -d)
+          trap 'rm -rf "$output"' EXIT
+          .venv/bin/python bin/private-infra render --inventory examples/inventory.example.yaml --profile central --output "$output/central"
+          .venv/bin/python bin/private-infra render --inventory examples/inventory.example.yaml --profile node --node node01 --output "$output/node"
+          docker compose --project-directory "$output/central" -f "$output/central/compose.yaml" config --quiet
+          docker compose --project-directory "$output/node" -f "$output/node/compose.yaml" config --quiet
